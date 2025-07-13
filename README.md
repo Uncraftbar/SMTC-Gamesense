@@ -13,8 +13,9 @@ A C#/.NET 8 Windows desktop application that runs in the system tray and integra
 ## Requirements
 
 - Windows 10/11 x64
-- .NET 8 Runtime
 - SteelSeries Engine with Gamesense-compatible device (keyboard with OLED display)
+
+> **Note**: No .NET runtime installation required - the executable is self-contained.
 
 ## How It Works
 
@@ -26,7 +27,7 @@ A C#/.NET 8 Windows desktop application that runs in the system tray and integra
 6. Gamesense displays the media info on the keyboard OLED
 7. The tray icon tooltip shows the current track or status
 
-## Building and Running
+## Building
 
 ### Prerequisites
 - .NET 8 SDK
@@ -53,6 +54,50 @@ The application registers itself as a game called "SMTC Media Player" and create
 
 - Line 1: Artist name (truncated to fit OLED width)
 - Line 2: Song title (truncated to fit OLED width)
+
+## Installation
+
+### Download from GitHub Releases (Recommended)
+
+1. **Download**: Go to the [Releases page](../../releases) and download `SMTCGamesense.exe`
+2. **Place**: Copy the executable to a permanent location (e.g., `C:\Program Files\SMTCGamesense\` or `%LOCALAPPDATA%\SMTCGamesense\`)
+3. **Run**: Double-click `SMTCGamesense.exe` to start the application
+4. **Verify**: Look for the system tray icon near your clock
+
+> **Note**: The executable is self-contained and requires no additional installation or .NET runtime.
+
+### Setting Up Autostart
+
+To have SMTC-Gamesense start automatically when Windows boots:
+
+#### Option 1: Windows Startup Registry (Recommended)
+1. Open PowerShell as Administrator or regular user
+2. Run this command (replace the path with your executable location):
+```powershell
+$regPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
+Set-ItemProperty -Path $regPath -Name "SMTCGamesense" -Value "C:\Path\To\SMTCGamesense.exe"
+```
+
+#### Option 2: Startup Folder
+1. Press `Win + R`, type `shell:startup`, press Enter
+2. Copy `SMTCGamesense.exe` to the opened folder
+3. The application will start with Windows
+
+#### Option 3: Task Scheduler (Most Reliable)
+1. Open **Task Scheduler** (`Win + R` → `taskschd.msc`)
+2. Click **Create Basic Task**
+3. Name: `SMTC Gamesense`
+4. Trigger: **When I log on**
+5. Action: **Start a program** → Browse to your `SMTCGamesense.exe`
+6. Finish
+
+### Removing Autostart
+```powershell
+# Remove from registry
+Remove-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "SMTCGamesense"
+
+# Or delete from startup folder, or remove scheduled task
+```
 
 ## Usage
 
