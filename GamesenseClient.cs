@@ -1,4 +1,5 @@
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System.Text;
 
 namespace SMTCGamesense;
@@ -8,12 +9,48 @@ public class GamesenseClient : IDisposable
     private readonly HttpClient _httpClient;
     private readonly string _gameId = "SMTC_GAMESENSE";
     private readonly string _eventId = "MEDIA_PLAYING";
-    private readonly string _gamesenseEndpoint = "http://127.0.0.1:51130"; // Default Gamesense endpoint
+    private string _gamesenseEndpoint = "http://127.0.0.1:3000"; // Default fallback
     private bool _isRegistered = false;
 
     public GamesenseClient()
     {
         _httpClient = new HttpClient();
+        LoadGamesenseEndpoint();
+    }
+
+    private void LoadGamesenseEndpoint()
+    {
+        try
+        {
+            var corePropsPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                "SteelSeries", "SteelSeries Engine 3", "coreProps.json");
+
+            if (File.Exists(corePropsPath))
+            {
+                var jsonContent = File.ReadAllText(corePropsPath);
+                var coreProps = JObject.Parse(jsonContent);
+                var address = coreProps["address"]?.ToString();
+
+                if (!string.IsNullOrEmpty(address))
+                {
+                    _gamesenseEndpoint = $"http://{address}";
+                    System.Diagnostics.Debug.WriteLine($"Gamesense endpoint loaded: {_gamesenseEndpoint}");
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine("No address found in coreProps.json, using default endpoint");
+                }
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine($"coreProps.json not found at: {corePropsPath}, using default endpoint");
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error loading Gamesense endpoint: {ex.Message}, using default");
+        }
     }
 
     public async Task SendMediaInfoAsync(MediaInfo mediaInfo)
@@ -22,12 +59,19 @@ public class GamesenseClient : IDisposable
         {
             if (!_isRegistered)
             {
+                System.Diagnostics.Debug.WriteLine($"Registering game with Gamesense at: {_gamesenseEndpoint}");
                 await RegisterGameAsync();
                 await RegisterEventAsync();
                 _isRegistered = true;
+                System.Diagnostics.Debug.WriteLine("Gamesense registration completed");
             }
 
             await SendEventAsync(mediaInfo);
+        }
+        catch (HttpRequestException httpEx)
+        {
+            System.Diagnostics.Debug.WriteLine($"HTTP error connecting to Gamesense at {_gamesenseEndpoint}: {httpEx.Message}");
+            _isRegistered = false; // Reset registration status to retry next time
         }
         catch (Exception ex)
         {
@@ -47,81 +91,74 @@ public class GamesenseClient : IDisposable
         var json = JsonConvert.SerializeObject(gameData);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-        await _httpClient.PostAsync($"{_gamesenseEndpoint}/game_metadata", content);
+        System.Diagnostics.Debug.WriteLine($"Registering game: {json}");
+        var response = await _httpClient.PostAsync($"{_gamesenseEndpoint}/game_metadata", content);
+        System.Diagnostics.Debug.WriteLine($"Game registration response: {response.StatusCode}");
     }
 
-    private async Task RegisterEventAsync()
+private async Task RegisterEventAsync()
+{
+    var eventData = new JObject
     {
-        var eventData = new
+        ["game"] = _gameId,
+        ["event"] = _eventId,
+        ["icon_id"] = 23,
+        ["handlers"] = new JArray
         {
-            game = _gameId,
-            @event = _eventId,
-            min_value = 0,
-            max_value = 1,
-            icon_id = 15, // Music note icon
-            handlers = new[]
+            new JObject
             {
-                new
+                ["device-type"] = "screened",
+                ["zone"] = "one",
+                ["mode"] = "screen",
+                ["datas"] = new JArray
                 {
-                    device_type = "keyboard",
-                    zone = "function-keys",
-                    mode = "screen",
-                    datas = new[]
+                    new JObject
                     {
-                        new
+                        ["lines"] = new JArray
                         {
-                            has_text = true,
-                            context_frame_key = "media-info"
-                        }
-                    }
-                }
-            }
-        };
-
-        var json = JsonConvert.SerializeObject(eventData);
-        var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-        await _httpClient.PostAsync($"{_gamesenseEndpoint}/bind_game_event", content);
-    }
-
-    private async Task SendEventAsync(MediaInfo mediaInfo)
-    {
-        var eventData = new
-        {
-            game = _gameId,
-            @event = _eventId,
-            data = new
-            {
-                value = 1,
-                frame = new Dictionary<string, object>
-                {
-                    ["media-info"] = new
-                    {
-                        lines = new[]
-                        {
-                            new
+                            new JObject
                             {
-                                type = "text",
-                                data = mediaInfo.Artist.Length > 20 ? mediaInfo.Artist[..17] + "..." : mediaInfo.Artist,
-                                size = 9
+                                ["has-text"] = true,
+                                ["context-frame-key"] = "song"
                             },
-                            new
+                            new JObject
                             {
-                                type = "text", 
-                                data = mediaInfo.Title.Length > 20 ? mediaInfo.Title[..17] + "..." : mediaInfo.Title,
-                                size = 9
+                                ["has-text"] = true,
+                                ["context-frame-key"] = "artist"
                             }
                         }
                     }
                 }
             }
-        };
+        }
+    };
 
-        var json = JsonConvert.SerializeObject(eventData);
-        var content = new StringContent(json, Encoding.UTF8, "application/json");
+    var json = eventData.ToString(Formatting.None);
+    var content = new StringContent(json, Encoding.UTF8, "application/json");
+    await _httpClient.PostAsync($"{_gamesenseEndpoint}/bind_game_event", content);
+}
 
-        await _httpClient.PostAsync($"{_gamesenseEndpoint}/game_event", content);
-    }
+private async Task SendEventAsync(MediaInfo mediaInfo)
+{
+    var eventData = new
+    {
+        game = _gameId,
+        @event = _eventId,
+        data = new
+        {
+            value = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+            frame = new Dictionary<string, object>
+            {
+                ["song"] = mediaInfo.Title,
+                ["artist"] = mediaInfo.Artist
+            }
+        }
+    };
+
+    var json = JsonConvert.SerializeObject(eventData);
+    var content = new StringContent(json, Encoding.UTF8, "application/json");
+    await _httpClient.PostAsync($"{_gamesenseEndpoint}/game_event", content);
+}
 
     public void Dispose()
     {

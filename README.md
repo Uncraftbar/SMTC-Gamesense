@@ -19,11 +19,12 @@ A C#/.NET 8 Windows desktop application that runs in the system tray and integra
 ## How It Works
 
 1. The application starts and creates a system tray icon
-2. Every second, it checks the current media session using SMTC
-3. If media is playing, it extracts the artist and title
-4. The information is sent to SteelSeries Gamesense via REST API (http://127.0.0.1:3000)
-5. Gamesense displays the media info on the keyboard OLED
-6. The tray icon tooltip shows the current track or status
+2. **Dynamic Endpoint Discovery**: Reads the Gamesense endpoint from `%PROGRAMDATA%\SteelSeries\SteelSeries Engine 3\coreProps.json`
+3. Every second, it checks the current media session using SMTC
+4. If media is playing, it extracts the artist and title
+5. The information is sent to SteelSeries Gamesense via REST API
+6. Gamesense displays the media info on the keyboard OLED
+7. The tray icon tooltip shows the current track or status
 
 ## Building and Running
 
@@ -45,34 +46,6 @@ Or run the executable directly:
 ```powershell
 .\bin\Debug\net8.0-windows10.0.17763.0\SMTCGamesense.exe
 ```
-
-## Architecture
-
-### Main Components
-
-- **Program.cs**: Application entry point
-- **SMTCGamesenseApp.cs**: Main application logic, system tray management, and coordination
-- **MediaSessionMonitor.cs**: SMTC integration for reading Windows media information
-- **GamesenseClient.cs**: SteelSeries Gamesense REST API client
-
-### Key Classes
-
-#### `SMTCGamesenseApp`
-- Inherits from `ApplicationContext` for proper WinForms tray application behavior
-- Manages system tray icon and context menu
-- Coordinates between media monitoring and Gamesense communication
-- Handles the main timer loop for periodic updates
-
-#### `MediaSessionMonitor`
-- Uses `GlobalSystemMediaTransportControlsSessionManager` for SMTC access
-- Extracts artist, title, and playback status from current media session
-- Handles cases where no media is playing or SMTC is unavailable
-
-#### `GamesenseClient`
-- Implements SteelSeries Gamesense REST API protocol
-- Handles game registration, event binding, and data sending
-- Manages HTTP communication with the local Gamesense service
-- Formats media information for OLED display
 
 ## SteelSeries Gamesense Integration
 
