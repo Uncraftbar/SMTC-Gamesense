@@ -9,6 +9,8 @@ public class SMTCGamesenseApp : ApplicationContext
     private System.Windows.Forms.Timer? _timer;
     private MediaSessionMonitor? _mediaMonitor;
     private GamesenseClient? _gamesenseClient;
+    private ToolStripMenuItem? _pauseMenuItem;
+    private bool _isPaused;
     private string _currentTooltip = "SMTC Gamesense - No media playing";
 
     public SMTCGamesenseApp()
@@ -32,9 +34,26 @@ public class SMTCGamesenseApp : ApplicationContext
     private ContextMenuStrip CreateContextMenu()
     {
         var contextMenu = new ContextMenuStrip();
+        _pauseMenuItem = new ToolStripMenuItem("Pause Monitoring", null, OnPauseResume);
+        var intervalMenuItem = new ToolStripMenuItem("Update Interval");
+        intervalMenuItem.DropDownItems.Add(CreateIntervalMenuItem("1 second", 1000, isChecked: true));
+        intervalMenuItem.DropDownItems.Add(CreateIntervalMenuItem("2 seconds", 2000));
+        intervalMenuItem.DropDownItems.Add(CreateIntervalMenuItem("5 seconds", 5000));
         var exitMenuItem = new ToolStripMenuItem("Exit", null, OnExit);
+        contextMenu.Items.Add(_pauseMenuItem);
+        contextMenu.Items.Add(intervalMenuItem);
+        contextMenu.Items.Add(new ToolStripSeparator());
         contextMenu.Items.Add(exitMenuItem);
         return contextMenu;
+    }
+
+    private ToolStripMenuItem CreateIntervalMenuItem(string text, int intervalMs, bool isChecked = false)
+    {
+        return new ToolStripMenuItem(text, null, OnIntervalChanged)
+        {
+            Checked = isChecked,
+            Tag = intervalMs
+        };
     }
 
     private void InitializeComponents()
@@ -101,6 +120,42 @@ public class SMTCGamesenseApp : ApplicationContext
         _timer?.Dispose();
         _trayIcon?.Dispose();
         ExitThread();
+    }
+
+    private void OnPauseResume(object? sender, EventArgs e)
+    {
+        _isPaused = !_isPaused;
+
+        if (_isPaused)
+        {
+            _timer?.Stop();
+            if (_pauseMenuItem != null)
+                _pauseMenuItem.Text = "Resume Monitoring";
+            if (_trayIcon != null)
+                _trayIcon.Text = "SMTC Gamesense - Paused";
+            return;
+        }
+
+        _timer?.Start();
+        if (_pauseMenuItem != null)
+            _pauseMenuItem.Text = "Pause Monitoring";
+    }
+
+    private void OnIntervalChanged(object? sender, EventArgs e)
+    {
+        if (sender is not ToolStripMenuItem selectedItem || selectedItem.Tag is not int intervalMs)
+            return;
+
+        if (_timer != null)
+            _timer.Interval = intervalMs;
+
+        if (selectedItem.GetCurrentParent() is not ToolStripDropDownMenu parentMenu)
+            return;
+
+        foreach (var item in parentMenu.Items.OfType<ToolStripMenuItem>())
+            item.Checked = false;
+
+        selectedItem.Checked = true;
     }
 
     protected override void Dispose(bool disposing)

@@ -105,7 +105,7 @@ Remove-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" 
 2. Start the SMTC-Gamesense application
 3. Play media in any Windows application (Spotify, Windows Media Player, browsers, etc.)
 4. Check your SteelSeries keyboard OLED for media information display
-5. Right-click the system tray icon to exit the application
+5. Right-click the system tray icon to pause/resume monitoring, customize update interval, or exit the application
 
 ## Dependencies
 
